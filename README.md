@@ -1,22 +1,69 @@
-# AWS-Three-Tier-Web-Architecture
+# AWS Three-Tier Web Architecture
 
-> Project imported from [RoyGeagea/aws-dynamic-website](https://github.com/RoyGeagea/aws-dynamic-website) by Roy Geagea.
-> The source repository does not include a LICENSE file, so the original author retains copyright.
-> All original content is preserved below.
+> Project imported from [RoyGeagea/aws-dynamic-website](https://github.com/RoyGeagea/aws-dynamic-website) by **Roy Geagea**.
+> The source repository does **not** include a LICENSE file, so the original author retains copyright.
+> All original content is preserved in the [Deployment Guide](#deployment-guide) section below.
 
 ---
 
-# AWS - Host dynamic website using three-tier architecture
+## Table of Contents
+
+- [Overview](#overview)
+- [Architecture](#architecture)
+- [Repository Contents](#repository-contents)
+- [Prerequisites](#prerequisites)
+- [Deployment Guide](#deployment-guide)
+- [Security Note](#security-note)
+- [Attribution](#attribution)
+
+---
 
 ## Overview
-We are developing a robust and resilient E-commerce application in the us-east-1 region of AWS, leveraging two availability zones: us-east-1a and us-east-1b. The architecture comprises the following components and services to ensure high availability and fault tolerance:
 
-![](architecture.png)
+We are developing a robust and resilient **E-commerce application** in the `us-east-1` region of AWS, leveraging two availability zones: `us-east-1a` and `us-east-1b`. The architecture comprises the following components and services to ensure high availability and fault tolerance:
+
+- A custom **VPC** with public and private subnets across two AZs.
+- **Internet Gateway** and **NAT Gateways** for inbound/outbound internet access.
+- **Application Load Balancer (ALB)** to distribute traffic to web servers.
+- **EC2 web servers** running a PHP/Laravel application (FleetCart).
+- **Amazon RDS (MySQL)** as the database layer in private data subnets.
+- **S3 buckets** to host and distribute application and dummy data.
+- **Amazon Route 53** for domain management and an **ACM** SSL certificate.
+- **Auto Scaling Group** to keep the fleet of web servers resilient.
+
+## Architecture
+
+![Three-tier architecture](architecture.png)
+
+The solution follows a classic **three-tier** separation inside the VPC:
+
+| Tier | Components | Location |
+|------|-----------|----------|
+| **Presentation** | Internet Gateway, Application Load Balancer, NAT Gateways, Route 53, ACM certificate | Public subnets (`10.0.0.0/24`, `10.0.1.0/24`) |
+| **Application** | EC2 web servers (Apache + PHP 7.4 + FleetCart), Auto Scaling Group | Private app subnets (`10.0.2.0/24`, `10.0.3.0/24`) |
+| **Data** | Amazon RDS MySQL (single-AZ, free-tier friendly) | Private data subnets (`10.0.4.0/24`, `10.0.5.0/24`) |
+
+## Repository Contents
+
+| File | Description |
+|------|-------------|
+| `README.md` | This document — the full deployment guide. |
+| `architecture.png` | Visual diagram of the three-tier architecture. |
+| `FleetCart.zip` | FleetCart e-commerce application bundle (PHP/Laravel) deployed to the web servers. The embedded `.env` ships with a blank `APP_KEY` — see [Security Note](#security-note). |
+| `bootstrap.txt` | One-pass EC2 setup script for Amazon Linux 2: installs Apache, PHP 7.4, MySQL, and deploys FleetCart from S3. |
+| `fleetcart.sql` | MySQL database dump imported into RDS to seed the store. |
+| `dummy.zip` | Git LFS pointer to ~224 MB of dummy product/image data (fetched with `git lfs pull`; uploaded to a second S3 bucket). |
 
 ## Prerequisites
-Have basic AWS knowledge
 
-## Steps
+- Basic AWS knowledge.
+- An AWS account (free tier recommended) with permission to create the services above.
+- A registered domain name (used later with Route 53 and ACM for HTTPS).
+- Optional: **MySQL Workbench** and a bastion host to import `fleetcart.sql` into RDS.
+
+## Deployment Guide
+
+The original step-by-step guide from [Roy Geagea/aws-dynamic-website](https://github.com/RoyGeagea/aws-dynamic-website), preserved in full below.
 
 ### 1- Create a VPC
 To create a VPC with proper DNS configuration, it's crucial to enable DNS resolution and DNS hostnames. DNS resolution allows your VPC resources to resolve domain names to IP addresses, facilitating communication with other resources within the VPC and beyond. On the other hand, enabling DNS hostnames allows your resources to have meaningful and memorable domain names, making them easily accessible.
@@ -433,3 +480,17 @@ To create a new Auto Scaling Group using an EC2 launch template and the new AMI,
 ## Summary
 
 By following these steps, you will have created a new Auto Scaling Group using the EC2 launch template and the new AMI. The Auto Scaling Group will automatically manage the desired number of instances based on the defined scaling policies, ensuring high availability and scalability for your application.
+
+---
+
+## Security Note
+
+- The `FleetCart.zip` bundle originally shipped with a Laravel **`APP_KEY`** value inside its `.env`. That value was **blanked** before import so no secret is committed to this repository. When you deploy, generate a fresh key with `php artisan key:generate` and set your DB credentials via environment variables.
+- `dummy.zip` is a **Git LFS pointer** (the source `.gitattributes` stores it via LFS). Run `git lfs pull` to download the actual data before using it.
+- Avoid committing `.env` files or AWS credentials. Use IAM roles on EC2 instances (see step 14) instead of static keys.
+
+## Attribution
+
+- **Tutorial & repository**: [Roy Geagea — aws-dynamic-website](https://github.com/RoyGeagea/aws-dynamic-website)
+- **Application bundle**: FleetCart (Laravel e-commerce) — see its own license inside the package.
+- The source repository declares **no LICENSE**, so the original author retains copyright over the tutorial and diagram. Imported with permission of the project's public availability.
